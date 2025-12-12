@@ -1,0 +1,113 @@
+name: Auto Version and Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  version-and-release:
+    if: github.event.pull_request.merged == true
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '4.6.x'
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Get current version
+        id: get_version
+        shell: pwsh
+        run: |
+          $assemblyInfoPath = "TempFolderRemover/TempFolderRemover/Properties/AssemblyInfo.cs"
+          $content = Get-Content $assemblyInfoPath -Raw
+          if ($content -match 'AssemblyVersion\("(\d+)\.(\d+)\.(\d+)\.(\d+)"\)') {
+            $major = [int]$matches[1]
+            $minor = [int]$matches[2]
+            $patch = [int]$matches[3]
+            $build = [int]$matches[4]
+            
+            # Increment patch version
+            $patch++
+            
+            $newVersion = "$major.$minor.$patch.$build"
+            $shortVersion = "$major.$minor.$patch"
+            
+            echo "CURRENT_VERSION=$major.$minor.$patch" >> $env:GITHUB_OUTPUT
+            echo "NEW_VERSION=$newVersion" >> $env:GITHUB_OUTPUT
+            echo "SHORT_VERSION=$shortVersion" >> $env:GITHUB_OUTPUT
+            
+            Write-Host "Current version: $major.$minor.$patch"
+            Write-Host "New version: $newVersion"
+          }
+      
+      - name: Update version in AssemblyInfo.cs
+        shell: pwsh
+        run: |
+          $assemblyInfoPath = "TempFolderRemover/TempFolderRemover/Properties/AssemblyInfo.cs"
+          $content = Get-Content $assemblyInfoPath -Raw
+          $newVersion = "${{ steps.get_version.outputs.NEW_VERSION }}"
+          
+          $content = $content -replace 'AssemblyVersion\("\d+\.\d+\.\d+\.\d+"\)', "AssemblyVersion(`"$newVersion`")"
+          $content = $content -replace 'AssemblyFileVersion\("\d+\.\d+\.\d+\.\d+"\)', "AssemblyFileVersion(`"$newVersion`")"
+          
+          Set-Content -Path $assemblyInfoPath -Value $content
+          
+          Write-Host "Updated AssemblyInfo.cs to version $newVersion"
+      
+      - name: Restore NuGet packages
+        run: nuget restore TempFolderRemover/TempFolderRemover.sln
+      
+      - name: Build solution
+        run: msbuild TempFolderRemover/TempFolderRemover.sln /p:Configuration=Release /p:Platform="Any CPU"
+      
+      - name: Create release package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.SHORT_VERSION }}"
+          $outputDir = "TempFolderRemover/TempFolderRemover/bin/Release"
+          $zipName = "TempFolderRemover-v$version.zip"
+          
+          # Create zip file
+          Compress-Archive -Path "$outputDir/*" -DestinationPath $zipName
+          
+          Write-Host "Created release package: $zipName"
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_OUTPUT
+        id: create_zip
+      
+      - name: Commit version bump
+        shell: pwsh
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add TempFolderRemover/TempFolderRemover/Properties/AssemblyInfo.cs
+          git commit -m "Bump version to ${{ steps.get_version.outputs.SHORT_VERSION }}"
+          git push
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.SHORT_VERSION }}
+          name: Release v${{ steps.get_version.outputs.SHORT_VERSION }}
+          body: |
+            Auto-generated release for version ${{ steps.get_version.outputs.SHORT_VERSION }}
+            
+            **Changes:**
+            Merged PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}
+          files: ${{ steps.create_zip.outputs.ZIP_NAME }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

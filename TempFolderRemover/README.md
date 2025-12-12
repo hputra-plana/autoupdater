@@ -1,0 +1,1 @@
+# TempFolderRemover Windows Service
