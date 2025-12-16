@@ -77,7 +77,7 @@ namespace TempFolderRemover
 
                 if (files.Length == 0)
                 {
-                    LogMessage($"Test: No files found in {targetFolderPath}");
+                    LogMessage($"[Service]: No files found in {targetFolderPath}");
                     return;
                 }
 
