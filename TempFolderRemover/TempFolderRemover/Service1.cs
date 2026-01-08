@@ -27,7 +27,7 @@ namespace TempFolderRemover
             InitializeComponent();
 
             // Defaults in case external settings are not present
-            timerIntervalMinutes = 5;
+            timerIntervalMinutes = 1;
             targetFolderPath = @"C:\TempToClean";
             logFilePath = @"C:\TempFolderRemover\log.txt";
 
@@ -114,7 +114,7 @@ namespace TempFolderRemover
 
                 if (files.Length == 0)
                 {
-                    LogMessage($"[Result based on 08/01 changes] No files found in {targetFolderPath}");
+                    LogMessage($"[Test] No files found in {targetFolderPath}");
                     return;
                 }
 
