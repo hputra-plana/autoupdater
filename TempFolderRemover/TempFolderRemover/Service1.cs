@@ -114,7 +114,7 @@ namespace TempFolderRemover
 
                 if (files.Length == 0)
                 {
-                    LogMessage($"[Test QUEUE] No files found in {targetFolderPath}");
+                    LogMessage($"[Result based on 08/01 changes] No files found in {targetFolderPath}");
                     return;
                 }
 
