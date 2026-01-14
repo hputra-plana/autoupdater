@@ -86,6 +86,24 @@ jobs:
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_OUTPUT
         id: create_zip
       
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Install AWS CLI
+        shell: pwsh
+        run: choco install awscli -y
+
+      - name: Upload release zip to S3
+        shell: pwsh
+        run: |
+          $zip = "${{ steps.create_zip.outputs.ZIP_NAME }}"
+          aws --version
+          aws s3 cp "$zip" "s3://fabi-proxy-agents-dev/$zip"
+      
       - name: Commit version bump
         shell: pwsh
         run: |
